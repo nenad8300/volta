@@ -1,0 +1,9 @@
+name = "volta-notifier"
+main = "notifier.js"
+compatibility_date = "2026-01-01"
+[triggers]
+crons = ["* * * * *"]
+[vars]
+SUPABASE_URL = "https://XXXX.supabase.co"
+SITE_URL = "https://vas-domen.rs"
+MAIL_FROM = "VOLTA <booking@vas-domen.rs>"
