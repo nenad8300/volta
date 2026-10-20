@@ -1,4 +1,4 @@
-/* VOLTA — portal: dispečer/admin + aplikacija za vozače  (PIN fix v3) */
+/* VOLTA — portal: dispečer/admin + aplikacija za vozače  (PIN fix v3 · jezici vozača) */
 (function () {
   const { C, H, LIVE, db, notify } = window.VOLTA, M = window.VOLTA_MSG;
   const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
@@ -12,6 +12,16 @@
   let ME = null, VIEW = 'dash', D = { bookings: [], drivers: [], reviews: [] }, F = { st: 'active', q: '', from: '', to: '' };
   const load = async () => { [D.bookings, D.drivers, D.reviews] = await Promise.all([db.list('bookings'), db.list('drivers'), db.list('reviews')]); };
   const drv = id => D.drivers.find(d => d.id === id);
+  /* ---------- jezici vozača ---------- */
+  const FLAG = { sr: 'SR', ru: 'RU', en: 'EN' }, LNAME = { sr: 'srpski', ru: 'ruski', en: 'engleski' };
+  const DEMO_L = { d1: ['sr', 'ru', 'en'], d2: ['sr', 'en'], d3: ['sr', 'ru'] };
+  const dl = d => (d && Array.isArray(d.langs) && d.langs.length) ? d.langs : (d && DEMO_L[d.id]) || ['sr'];
+  const flags = d => '[' + dl(d).map(l => FLAG[l] || l).join('/') + ']';
+  const needRu = b => (b.extras || []).includes('ru_driver') || b.driver_lang === 'ru';
+  const ruOk = (b, d) => !needRu(b) || dl(d).includes('ru');
+  const ruTag = '<span class="badge" style="background:#e2c48d22;color:#e2c48d">RU · traži ruski</span>';
+  const drvOpts = (b, list, sel, withCar) => [...list].sort((x, y) => needRu(b) ? (dl(y).includes('ru') - dl(x).includes('ru')) : 0)
+    .map(d => `<option value="${d.id}" ${d.id === sel ? 'selected' : ''}>${esc(d.name)} ${flags(d)}${withCar ? ' · ' + esc(d.car) : ''}${ruOk(b, d) ? '' : ' ⚠ ne govori ruski'}</option>`).join('');
   const sortB = a => a.sort((x, y) => (x.date + x.time).localeCompare(y.date + y.time));
 
   /* ---------- login ---------- */
@@ -72,7 +82,7 @@
       <div class="grid2"><div class="card"><h3>Prihod — 14 dana <span class="mut">${eur(days.reduce((a, d) => a + d[1], 0))}</span></h3><div class="bars">${days.map(([k, v]) => `<div title="${eur(v)}"><i style="height:${v / mx * 100}%"></i><span>${k.slice(8)}</span></div>`).join('')}</div></div>
       <div class="card"><h3>Način plaćanja</h3><div class="donut" style="background:conic-gradient(${grad})"></div><div class="leg">${mix.map(([k, v]) => `<div><i style="background:${cols[k]}"></i>${H.PAY[k]}<b>${v}</b></div>`).join('')}</div></div></div>
       <div class="grid2"><div class="card list"><h3>Predstojeće vožnje <button class="btn sm" id="toRides">Sve →</button></h3>${up.map(b => `<div class="row"><div class="when"><b>${b.time}</b><small>${b.date.slice(8)}.${b.date.slice(5, 7)}.</small></div><div style="flex:1;min-width:0"><b class="ref" data-ref="${b.id}">${b.ref}</b> · ${esc(H.route(b))}<div class="mut" style="font-size:12px">${esc(b.name)} · ${H.cls(b.class).name} · ${drv(b.driver_id) ? esc(drv(b.driver_id).name) : '<span style="color:var(--acc)">bez vozača</span>'}</div></div>${badge(b.status)}</div>`).join('') || '<p class="mut">Nema.</p>'}</div>
-      <div class="card list"><h3>Vozači</h3>${D.drivers.map(d => `<div class="row"><div class="av" style="width:36px;height:36px">${esc(d.name[0])}</div><div style="flex:1"><b>${esc(d.name)}</b><div class="mut" style="font-size:12px">${esc(d.car)} · ${D.bookings.filter(b => b.driver_id === d.id && b.date === today()).length} danas</div></div><span class="badge" style="color:${d.active ? '#5affb0' : '#888'}">${d.active ? 'Online' : 'Offline'}</span></div>`).join('')}</div></div>`;
+      <div class="card list"><h3>Vozači</h3>${D.drivers.map(d => `<div class="row"><div class="av" style="width:36px;height:36px">${esc(d.name[0])}</div><div style="flex:1"><b>${esc(d.name)}</b> <span style="font-size:13px">${flags(d)}</span><div class="mut" style="font-size:12px">${esc(d.car)} · ${D.bookings.filter(b => b.driver_id === d.id && b.date === today()).length} danas</div></div><span class="badge" style="color:${d.active ? '#5affb0' : '#888'}">${d.active ? 'Online' : 'Offline'}</span></div>`).join('')}</div></div>`;
     $('#toRides').onclick = () => show('rides'); $('#newB').onclick = () => editBooking(); $$('[data-ref]').forEach(e => e.onclick = () => detail(D.bookings.find(b => b.id === e.dataset.ref)));
   }
 
@@ -88,9 +98,9 @@
       <span class="mut" style="align-self:center">${l.length} · ${eur(l.filter(b => b.status !== 'cancelled').reduce((a, b) => a + (b.price || 0), 0))}</span></div>
       <div class="tw"><table><thead><tr><th>Ref</th><th>Termin</th><th>Ruta</th><th>Putnik</th><th>Vozilo</th><th>Cena</th><th>Plaćanje</th><th>Vozač</th><th>Status</th></tr></thead><tbody>
       ${l.map(b => `<tr class="${b.status === 'new' ? 'new' : ''}"><td><span class="ref" data-ref="${b.id}">${b.ref}</span></td><td><b>${b.date.slice(8)}.${b.date.slice(5, 7)}.</b> ${b.time}${b.flight ? `<div class="mut" style="font-size:11.5px">✈ ${esc(b.flight)}</div>` : ''}</td>
-      <td>${esc(H.route(b))}<div class="mut" style="font-size:11.5px">${esc(b.addr || '')}</div></td><td>${esc(b.name)}<div class="mut" style="font-size:11.5px">${esc(b.phone)} · ${esc(b.channel || '')}</div></td>
+      <td>${esc(H.route(b))}<div class="mut" style="font-size:11.5px">${esc(b.addr || '')}</div></td><td>${esc(b.name)}${needRu(b) ? ' ' + ruTag : ''}<div class="mut" style="font-size:11.5px">${esc(b.phone)} · ${esc(b.channel || '')}</div></td>
       <td>${H.cls(b.class).name.replace('Tesla ', '')}<div class="mut" style="font-size:11.5px">👤${b.pax} 🧳${b.bags}</div></td><td><b>${eur(b.price)}</b></td><td>${payBadge(b)}</td>
-      <td><select class="in" data-as="${b.id}" ${['done', 'cancelled'].includes(b.status) ? 'disabled' : ''}><option value="">— dodeli —</option>${D.drivers.filter(d => d.active || d.id === b.driver_id).map(d => `<option value="${d.id}" ${d.id === b.driver_id ? 'selected' : ''}>${esc(d.name)}</option>`).join('')}</select></td>
+      <td><select class="in" data-as="${b.id}" ${['done', 'cancelled'].includes(b.status) ? 'disabled' : ''}><option value="">— dodeli —</option>${drvOpts(b, D.drivers.filter(d => d.active || d.id === b.driver_id), b.driver_id)}</select>${b.driver_id && !ruOk(b, drv(b.driver_id)) ? '<div style="color:#ffb35a;font-size:11.5px;margin-top:4px">⚠ vozač ne govori ruski</div>' : ''}</td>
       <td><select class="in" data-st="${b.id}">${Object.entries(H.STATUS).map(([k, v]) => `<option value="${k}" ${k === b.status ? 'selected' : ''}>${v[0]}</option>`).join('')}</select></td></tr>`).join('') || '<tr><td colspan="9" class="mut" style="text-align:center;padding:40px">Nema vožnji.</td></tr>'}</tbody></table></div>`;
     $('#fSt').value = F.st; $('#fSt').onchange = e => { F.st = e.target.value; rides(); }; $('#fFrom').onchange = e => { F.from = e.target.value; rides(); }; $('#fTo').onchange = e => { F.to = e.target.value; rides(); };
     $('#fQ').onchange = e => { F.q = e.target.value; rides(); };
@@ -99,7 +109,7 @@
     $$('[data-st]').forEach(s => s.onchange = async () => { const b = D.bookings.find(x => x.id === s.dataset.st); await patch(b, { status: s.value }); toast(`${b.ref} → ${H.STATUS[s.value][0]}`); rides(); });
     $('#newB').onclick = () => editBooking(); $('#csv').onclick = () => csv(l);
   }
-  async function assign(b, id) { await patch(b, { driver_id: id || null, status: id ? 'assigned' : 'confirmed' }); const d = drv(id); if (d) { toast(`${b.ref} → ${d.name}`); notify(`👤 ${b.ref} dodeljena: ${d.name}`); } }
+  async function assign(b, id) { const dd = drv(id); if (dd && !ruOk(b, dd) && !confirm(`Putnik traži vozača koji govori ruski, a ${dd.name} nema ruski u profilu. Ipak dodeliti?`)) return; await patch(b, { driver_id: id || null, status: id ? 'assigned' : 'confirmed' }); const d = drv(id); if (d) { toast(`${b.ref} → ${d.name}`); notify(`👤 ${b.ref} dodeljena: ${d.name}`); } }
   function csv(l) {
     const rows = [['ref', 'datum', 'vreme', 'ruta', 'ime', 'telefon', 'vozilo', 'putnici', 'kofera', 'cena', 'placanje', 'status_placanja', 'status', 'vozac'], ...l.map(b => [b.ref, b.date, b.time, H.route(b), b.name, b.phone, H.cls(b.class).name, b.pax, b.bags, b.price, b.pay_method, b.pay_status, b.status, drv(b.driver_id)?.name || ''])];
     const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + rows.map(r => r.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\n')], { type: 'text/csv' })); a.download = `volta-voznje-${today()}.csv`; a.click();
@@ -141,10 +151,10 @@
       <div class="kv"><span>Termin</span><span>${b.date} u ${b.time}</span><span>Adresa</span><span>${esc(b.addr || '—')}</span>
       ${b.flight ? `<span>Let</span><span>${esc(b.flight)} · <a style="color:var(--acc)" target="_blank" href="https://www.flightradar24.com/data/flights/${esc(b.flight.toLowerCase())}">status →</a></span>` : ''}
       <span>Putnik</span><span>${esc(b.name)}<br><a style="color:var(--acc)" href="tel:${esc(b.phone)}">${esc(b.phone)}</a> ${b.email ? '· ' + esc(b.email) : ''}</span><span>Kanal / jezik</span><span>${esc(b.channel || '—')} · ${esc((b.lang || 'ru').toUpperCase())}</span>
-      <span>Vozilo</span><span>${H.cls(b.class).name} · 👤${b.pax} 🧳${b.bags}</span><span>Dodaci</span><span>${esc((b.extras || []).join(', ') || '—')}</span>
+      <span>Vozilo</span><span>${H.cls(b.class).name} · 👤${b.pax} 🧳${b.bags}</span><span>Dodaci</span><span>${esc((b.extras || []).filter(x => x !== 'ru_driver').join(', ') || '—')}</span>${needRu(b) ? '<span>Jezik vozača</span><span>' + ruTag + '</span>' : ''}
       <span>Cena</span><span><b>${eur(b.price)}</b></span><span>Plaćanje</span><span>${H.PAY[b.pay_method]} · ${b.pay_status}</span>
       ${d ? `<span>Zarada vozača</span><span>${eur(H.driverShare(b, d))}</span>` : ''}${b.note ? `<span>Napomena</span><span>${esc(b.note)}</span>` : ''}</div>
-      <label class="l">Vozač</label><select class="in" id="dwDrv"><option value="">— nije dodeljen —</option>${D.drivers.map(x => `<option value="${x.id}" ${x.id === b.driver_id ? 'selected' : ''}>${esc(x.name)} · ${esc(x.car)}</option>`).join('')}</select>
+      <label class="l">Vozač</label><select class="in" id="dwDrv"><option value="">— nije dodeljen —</option>${drvOpts(b, D.drivers, b.driver_id, true)}</select>
       <div class="acts">${d ? `<a class="btn" target="_blank" href="${waLink(d.phone, msgDrv)}">🚘 Pošalji vozaču</a>` : ''}${b.pay_status !== 'paid' ? '<button class="btn" id="dwPaid">✓ Plaćeno</button>' : ''}<button class="btn" id="dwEdit">✎ Izmeni</button>${b.status !== 'cancelled' ? '<button class="btn bad" id="dwCancel">Otkaži</button>' : ''}</div>
       <label class="l" style="margin-top:20px">Poruke putniku</label><div class="acts">${M.RULES.map(r => `<button class="btn sm ${(b.msg_log || {})[r.id] ? '' : M.due(b).includes(r.id) ? 'acc' : ''}" data-msg="${r.id}">${(b.msg_log || {})[r.id] ? '✓ ' : ''}${r.label}</button>`).join('')}</div>
       <label class="l" style="margin-top:20px">Istorija</label><div class="hist">${(b.history || []).map(h => `<div><b>${H.STATUS[h.s]?.[0] || h.s}</b> <span class="mut">${new Date(h.t).toLocaleString('sr-Latn')}${h.by ? ' · ' + esc(h.by) : ''}</span></div>`).join('')}</div>`;
@@ -167,13 +177,14 @@
       <div><label class="l">Putnici</label><input class="in" type="number" min="1" max="8" id="ePax" value="${b.pax}"></div><div><label class="l">Kofera</label><input class="in" type="number" min="0" max="8" id="eBags" value="${b.bags}"></div>
       <div><label class="l">Plaćanje</label><select class="in" id="ePay">${Object.entries(H.PAY).map(([k, v]) => `<option value="${k}" ${k === b.pay_method ? 'selected' : ''}>${v}</option>`).join('')}</select></div><div><label class="l">Cena (RSD)</label><input class="in" type="number" id="ePrice" value="${b.price ?? ''}" placeholder="auto"></div>
       <div><label class="l">Jezik poruka</label><select class="in" id="eLang">${['ru', 'sr', 'en'].map(l => `<option ${l === b.lang ? 'selected' : ''}>${l}</option>`).join('')}</select></div><div><label class="l">Kanal</label><select class="in" id="eCh">${['whatsapp', 'telegram', 'viber', 'email', 'phone'].map(l => `<option ${l === b.channel ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
-      <div style="grid-column:1/-1"><label class="l">Napomena</label><input class="in" id="eNote" value="${esc(b.note || '')}"></div></div><button class="btn acc big" id="eSave" style="margin-top:18px">Sačuvaj</button>`;
+      <div style="grid-column:1/-1"><label class="l">Napomena</label><input class="in" id="eNote" value="${esc(b.note || '')}"></div><label class="l" style="grid-column:1/-1;text-transform:none;letter-spacing:0;font-size:13.5px;color:var(--txt)"><input type="checkbox" id="eRu" ${needRu(b) ? 'checked' : ''}> Potreban vozač koji govori ruski (RU)</label></div><button class="btn acc big" id="eSave" style="margin-top:18px">Sačuvaj</button>`;
     $('#drawer').classList.add('open'); $('#dwX').onclick = closeD;
     const auto = () => { const k = $('#eFrom').value === 'ns' ? $('#eTo').value : $('#eFrom').value, v = C.prices['ns-' + k]; return v != null ? v * H.cls($('#eCls').value).mult : null; };
     $('#eSave').onclick = async () => {
       const v = { from: $('#eFrom').value, to: $('#eTo').value, date: $('#eDate').value, time: $('#eTime').value, addr: $('#eAddr').value, name: $('#eName').value, phone: $('#ePhone').value, flight: $('#eFl').value.toUpperCase(), class: $('#eCls').value, pax: +$('#ePax').value, bags: +$('#eBags').value, pay_method: $('#ePay').value, note: $('#eNote').value, lang: $('#eLang').value, channel: $('#eCh').value, price: +$('#ePrice').value || auto() };
+      const ex = (b.extras || ['sign']).filter(x => x !== 'ru_driver'); if ($('#eRu').checked) ex.push('ru_driver'); v.extras = ex;
       if (!v.name || !v.phone) return toast('Ime i telefon su obavezni');
-      if (n) await db.insert('bookings', { ...v, ref: H.ref(), status: 'confirmed', pay_status: 'unpaid', driver_id: null, return_trip: false, extras: ['sign'], msg_log: {}, history: [{ s: 'confirmed', t: H.now(), by: ME.name }] }); else await patch(b, v);
+      if (n) await db.insert('bookings', { ...v, ref: H.ref(), status: 'confirmed', pay_status: 'unpaid', driver_id: null, return_trip: false, msg_log: {}, history: [{ s: 'confirmed', t: H.now(), by: ME.name }] }); else await patch(b, v);
       await load(); closeD(); show(VIEW, true); toast('Sačuvano');
     };
   }
@@ -186,7 +197,7 @@
   }
   function drivers() {
     const m = today().slice(0, 7) + '-01';
-    $('#main').innerHTML = top('Vozači', '<button class="btn acc" id="addD">+ Dodaj vozača</button>') + `<div class="dgrid">${D.drivers.map(d => { const s = stats(d, m), a = stats(d); return `<div class="dc"><div class="dc-h"><div class="av">${esc(d.name[0])}</div><div style="flex:1"><b style="font-size:16px">${esc(d.name)}</b><div class="mut" style="font-size:12px">${esc(d.car)} · ${esc(d.plate)}</div></div><span class="badge" style="color:${d.active ? '#5affb0' : '#888'}">${d.active ? 'Aktivan' : 'Neaktivan'}</span></div>
+    $('#main').innerHTML = top('Vozači', '<button class="btn acc" id="addD">+ Dodaj vozača</button>') + `<div class="dgrid">${D.drivers.map(d => { const s = stats(d, m), a = stats(d); return `<div class="dc"><div class="dc-h"><div class="av">${esc(d.name[0])}</div><div style="flex:1"><b style="font-size:16px">${esc(d.name)}</b><div class="mut" style="font-size:12px">${esc(d.car)} · ${esc(d.plate)}</div><div style="font-size:12.5px;margin-top:3px">${dl(d).map(l => `<span class="badge" style="background:${l === 'ru' ? '#e2c48d22' : '#ffffff10'};color:${l === 'ru' ? '#e2c48d' : '#c9ccd2'};margin-right:4px">${LNAME[l] || l}</span>`).join('')}</div></div><span class="badge" style="color:${d.active ? '#5affb0' : '#888'}">${d.active ? 'Aktivan' : 'Neaktivan'}</span></div>
       <div class="dstats"><div><small>Vožnje (mes.)</small><b>${s.n}</b></div><div><small>Promet</small><b>${eur(s.gross)}</b></div><div><small>Zarada</small><b>${eur(s.share)}</b></div><div><small>Ocena</small><b>★ ${d.rating || '5.0'}</b></div><div><small>Provizija</small><b>${Math.round((d.commission ?? C.commissionDefault) * 100)}%</b></div><div><small>Keš kod vozača</small><b>${eur(s.cash)}</b></div></div>
       <div class="bal"><span class="mut">${a.owe >= 0 ? 'Platforma duguje vozaču' : 'Vozač duguje platformi'}</span><b style="font-size:19px;color:${a.owe >= 0 ? 'var(--ok)' : 'var(--warn)'}">${eur(Math.abs(a.owe))}</b></div>
       <div class="acts"><button class="btn sm" data-ed="${d.id}">✎ Izmeni</button>${a.open.length ? `<button class="btn sm acc" data-set="${d.id}">Izmiri ${a.open.length}</button>` : ''}<a class="btn sm" href="tel:${esc(d.phone)}">☎</a><a class="btn sm" target="_blank" href="${waLink(d.phone, '')}">💬</a></div></div>`; }).join('')}</div>`;
@@ -200,9 +211,10 @@
       <label class="l">Vozilo</label><select class="in" id="xC">${['Tesla Model 3', 'Tesla Model Y'].map(c => `<option ${c === d.car ? 'selected' : ''}>${c}</option>`).join('')}</select>
       <label class="l">Registracija</label><input class="in" id="xR" value="${esc(d.plate)}"><label class="l">Provizija platforme (%)</label><input class="in" type="number" id="xK" value="${Math.round((d.commission ?? C.commissionDefault) * 100)}">
       ${LIVE ? '<p class="mut" style="margin-top:12px;font-size:12px">Login vozača: Supabase → Authentication → Add user, pa red u tabeli profiles (role=driver, driver_id).</p>' : `<label class="l">PIN</label><input class="in" id="xPin" value="${esc(d.pin || '')}" maxlength="6">`}
+      <label class="l">Jezici koje vozač govori</label><div style="display:flex;gap:14px;flex-wrap:wrap">${['sr', 'ru', 'en'].map(l => `<label style="display:flex;gap:6px;align-items:center;cursor:pointer"><input type="checkbox" data-lg="${l}" ${dl(d).includes(l) ? 'checked' : ''}> ${LNAME[l]}</label>`).join('')}</div>
       <label class="l"><input type="checkbox" id="xA" ${d.active ? 'checked' : ''}> Aktivan</label><button class="btn acc big" id="xS" style="margin-top:14px">Sačuvaj</button>`;
     $('#drawer').classList.add('open'); $('#dwX').onclick = closeD;
-    $('#xS').onclick = async () => { const v = { name: $('#xN').value.trim(), phone: $('#xP').value.trim(), car: $('#xC').value, plate: $('#xR').value.trim(), commission: (+$('#xK').value || 0) / 100, active: $('#xA').checked }; if (!LIVE) v.pin = $('#xPin').value.trim(); if (!v.name) return toast('Unesite ime');
+    $('#xS').onclick = async () => { const v = { name: $('#xN').value.trim(), phone: $('#xP').value.trim(), car: $('#xC').value, plate: $('#xR').value.trim(), commission: (+$('#xK').value || 0) / 100, active: $('#xA').checked, langs: $$('[data-lg]').filter(x => x.checked).map(x => x.dataset.lg) }; if (!v.langs.length) return toast('Izaberite bar jedan jezik'); if (!LIVE) v.pin = $('#xPin').value.trim(); if (!v.name) return toast('Unesite ime');
       n ? await db.insert('drivers', { ...v, rating: 5 }) : await db.update('drivers', d.id, v); await load(); closeD(); drivers(); };
   }
   let FF = { from: today().slice(0, 7) + '-01', to: today() };
@@ -246,7 +258,7 @@
     const l = DT === 'now' ? sortB(mine.filter(b => !['done', 'cancelled'].includes(b.status))) : mine.filter(b => b.status === 'done').sort((a, b) => (b.date + b.time).localeCompare(a.date + a.time)).slice(0, 40);
     $('#dBody').innerHTML = `<div class="rides">${l.map((b, i) => { const nx = NEXT[b.status], nav = `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(b.from === 'beg' ? 'Aerodrom Nikola Tesla Beograd' : (b.addr || 'Novi Sad'))}`;
       return `<div class="ride ${i === 0 && DT === 'now' ? 'hot' : ''}"><div class="ride-t"><div><div class="tm">${b.time}</div><div class="mut" style="font-size:12px;margin-top:4px">${new Date(b.date).toLocaleDateString('sr-Latn', { weekday: 'short', day: 'numeric', month: 'short' })}</div></div>${badge(b.status)}</div>
-        <h4>${esc(H.route(b))}</h4><div class="mut">${esc(b.addr || '')}</div><div class="meta"><span>👤 ${esc(b.name)}</span><span>👤${b.pax} 🧳${b.bags}</span>${b.flight ? `<span>✈ ${esc(b.flight)}</span>` : ''}${b.note ? `<span>📝 ${esc(b.note)}</span>` : ''}</div>
+        <h4>${esc(H.route(b))}</h4><div class="mut">${esc(b.addr || '')}</div><div class="meta"><span>👤 ${esc(b.name)}</span>${needRu(b) ? '<span style="color:#e2c48d">RU · putnik govori ruski</span>' : ''}<span>👤${b.pax} 🧳${b.bags}</span>${b.flight ? `<span>✈ ${esc(b.flight)}</span>` : ''}${b.note ? `<span>📝 ${esc(b.note)}</span>` : ''}</div>
         <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:14px">${payBadge(b)}<div class="pr">${eur(H.driverShare(b, d))}<small>vaša zarada · cena ${eur(b.price)}</small></div></div>
         ${DT === 'now' ? `<div class="quick"><a href="${nav}" target="_blank"><b>🧭</b>Navigacija</a><a href="tel:${esc(b.phone)}"><b>☎</b>Pozovi</a><a href="${waLink(b.phone, 'Dobar dan, ja sam ' + d.name + ', vaš vozač (' + C.brand + ').')}" target="_blank"><b>💬</b>WhatsApp</a>${b.flight ? `<a href="https://www.flightradar24.com/data/flights/${esc(b.flight.toLowerCase())}" target="_blank"><b>✈</b>Let</a>` : `<a href="sms:${esc(b.phone)}"><b>✉</b>SMS</a>`}</div>${nx ? `<button class="btn acc big" style="margin-top:12px" data-nx="${b.id}">${nx[1]}</button>` : ''}` : ''}</div>`; }).join('') || `<div class="empty"><b>☕</b>${DT === 'now' ? 'Nema dodeljenih vožnji.' : 'Još nema završenih vožnji.'}</div>`}</div>`;
     $$('[data-nx]').forEach(btn => btn.onclick = async () => { const b = D.bookings.find(x => x.id === btn.dataset.nx), nx = NEXT[b.status][0], p = { status: nx };
