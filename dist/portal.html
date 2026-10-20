@@ -63,7 +63,7 @@ pre.msg{white-space:pre-wrap;font:12.5px/1.45 Manrope,sans-serif;color:#c9ccd2;b
   <div class="logo"><i>V</i><span class="brandT">VOLTA</span></div>
   <h1 class="serif">Portal</h1><p class="mut">Dispečerski centar i aplikacija za vozače.</p>
   <div class="seg" id="lseg"><button class="on" data-r="admin">Dispečer / Admin</button><button data-r="driver">Vozač</button></div>
-  <div id="lDemo"><div id="lDrvW" hidden><label class="l">Vozač</label><select class="in" id="lDrv"></select></div><label class="l">PIN</label><input class="in" id="lPin" type="tel" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="PIN, npr. 0000" style="letter-spacing:.3em;font-size:18px"></div>
+  <div id="lDemo"><div id="lDrvW" hidden><label class="l">Vozač</label><select class="in" id="lDrv"></select></div><label class="l">PIN</label><input class="in" id="lPin" type="password" inputmode="numeric" maxlength="6" placeholder="PIN" autocomplete="off"></div>
   <div id="lLive" hidden><label class="l">Email</label><input class="in" id="lMail" type="email" autocomplete="username"><label class="l">Lozinka</label><input class="in" id="lPass" type="password" autocomplete="current-password"></div>
   <button class="btn acc big" id="lGo" style="margin-top:18px">Prijava</button>
   <div class="demo-n" id="lNote">DEMO režim — podaci se čuvaju u ovom pregledaču.<br>Admin PIN: <b>0000</b> · Vozači: Marko <b>1111</b>, Nikola <b>2222</b>, Stefan <b>3333</b><br>Otvori sajt u drugom tabu i napravi rezervaciju — stiže ovde uživo.</div>
@@ -85,9 +85,23 @@ pre.msg{white-space:pre-wrap;font:12.5px/1.45 Manrope,sans-serif;color:#c9ccd2;b
 </div>
 <div class="drawer" id="drawer"><div class="dw" id="dw"></div></div>
 <div class="toast" id="toast"></div>
-<script src="/js/config.js"></script>
-<script src="/js/store.js"></script>
-<script src="/js/messages.js"></script>
-<script src="/js/portal.js"></script>
+<script>
+/* PIN/lozinka zaštita (v4): nijedna druga skripta ne može da blokira kucanje u polja za prijavu */
+(function(){
+  var ids={lPin:1,lPass:1,lMail:1};
+  window.addEventListener('keydown',function(e){
+    var t=e.target; if(!t||!ids[t.id])return;
+    e.stopPropagation();
+    if(e.key==='Enter'){e.preventDefault();var b=document.getElementById('lGo');if(b)b.click();}
+  },true);
+  ['keypress','keyup','beforeinput','input'].forEach(function(n){
+    window.addEventListener(n,function(e){var t=e.target;if(t&&ids[t.id])e.stopPropagation();},true);
+  });
+})();
+</script>
+<script src="js/config.js?v=4"></script>
+<script src="js/store.js?v=4"></script>
+<script src="js/messages.js?v=4"></script>
+<script src="js/portal.js?v=4"></script>
 </body>
 </html>
